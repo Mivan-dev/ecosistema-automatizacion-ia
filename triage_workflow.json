@@ -1,0 +1,484 @@
+{
+  "name": "Sistema de Triage IA - Soporte Técnico",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ticket-ingreso",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "ec22c558-be07-4e77-a4b9-012d3b4a0dad",
+      "name": "Webhook - Ingreso de Ticket",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        -3008,
+        928
+      ],
+      "webhookId": "b5112274-affa-4ec8-a4f3-5aed2fdf5ba5"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.body.asunto }}",
+              "operation": "isNotEmpty"
+            },
+            {
+              "value1": "={{ $json.body.descripcion }}",
+              "operation": "isNotEmpty"
+            },
+            {
+              "value1": "={{ $json.body.canal }}",
+              "operation": "isNotEmpty"
+            }
+          ]
+        }
+      },
+      "id": "0d2b3ac2-77bb-462c-bd89-fc8362ff12fd",
+      "name": "Filtro - Validar Campos Obligatorios",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        -2800,
+        928
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $input.first().json.output || '';\n// Strip markdown code blocks if model wraps response\nconst cleaned = raw.replace(/```json\\n?/g, '').replace(/```/g, '').trim();\ntry {\n  const parsed = JSON.parse(cleaned);\n  return [{ json: { ...parsed, raw_response: raw } }];\n} catch(e) {\n  return [{ json: { parse_error: true, raw_response: raw } }];\n}"
+      },
+      "id": "c2388546-2ea7-4ca9-9d7e-dc8b4efd5589",
+      "name": "Code - Parsear Respuesta IA",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2256,
+        640
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.parse_error }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "efbec27c-9e83-4447-b118-c857e826dca5",
+      "name": "Router - ¿Error de Parseo?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        -1984,
+        640
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "databaseId": {
+          "__rl": true,
+          "value": "https://app.notion.com/p/3d727d4b39848083b065f62e4a505eb4?v=3d727d4b398480f09a59000caba39a91",
+          "mode": "url"
+        },
+        "simple": false,
+        "options": {}
+      },
+      "id": "eedaaa1e-dda8-4bbe-83eb-d6a3a0f4c502",
+      "name": "Notion - Guardar Ticket Procesado",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2,
+      "position": [
+        -1776,
+        784
+      ],
+      "credentials": {
+        "notionApi": {
+          "id": "KWEff7rSdcusFaMx",
+          "name": "Notion account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $('Code - Parsear Respuesta IA').item.json.requiere_humano }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "6f6212a9-1615-4aa3-a843-26761572a1df",
+      "name": "Router - ¿Requiere Aprobación Humana?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        -1552,
+        784
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "soporte@empresa.com",
+        "subject": "=⚠️ Ticket requiere aprobación: {{ $('Code - Parsear Respuesta IA').item.json.prioridad }} prioridad",
+        "message": "=<h2>Ticket requiere revisión humana</h2><p><b>Prioridad:</b> {{ $('Code - Parsear Respuesta IA').item.json.prioridad }}</p><p><b>Categoría:</b> {{ $('Code - Parsear Respuesta IA').item.json.categoria }}</p><p><b>Asunto:</b> {{ $('Webhook - Ingreso de Ticket').item.json.asunto }}</p><p><b>Respuesta sugerida por IA:</b></p><blockquote>{{ $('Code - Parsear Respuesta IA').item.json.respuesta_sugerida }}</blockquote><p><a href='https://open-hexagon-9c5.notion.site/3d727d4b39848083b065f62e4a505eb4'>Ver en Notion →</a></p><p>Respondé este email con APROBAR o RECHAZAR.</p>",
+        "options": {}
+      },
+      "id": "4b8c1762-4abd-4504-8e88-b1043641ce8e",
+      "name": "Gmail - Notificación Human-in-the-loop",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2,
+      "position": [
+        -1328,
+        656
+      ],
+      "webhookId": "e51ef231-a419-4ba8-a278-f3fb070af56c",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "8zzPmXNqVHTAqLfw",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "=ejemploemail@ejemplo.com",
+        "subject": "=Re: {{ $json.properties.Asunto }}",
+        "message": "=<p>Hola,</p><p>{{ $('Code - Parsear Respuesta IA').item.json.respuesta_sugerida }}</p><p>Saludos,<br>Equipo de Soporte</p>",
+        "options": {}
+      },
+      "id": "54daffbe-03e6-4431-91e4-ce9d56de7f21",
+      "name": "Gmail - Respuesta Automática al Cliente",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2,
+      "position": [
+        -1328,
+        928
+      ],
+      "webhookId": "fd645135-f545-4d1b-9091-05bf158c20ff",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "8zzPmXNqVHTAqLfw",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "databaseId": {
+          "__rl": true,
+          "value": "https://app.notion.com/p/3d727d4b3984800a8daae069c45828f0?v=3d727d4b3984808c892d000c96870413",
+          "mode": "url"
+        },
+        "simple": false,
+        "options": {}
+      },
+      "id": "1831a4db-8ca3-4158-a967-7fcb497bca2d",
+      "name": "Notion - Registrar Error de Parseo",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2,
+      "position": [
+        -1680,
+        512
+      ],
+      "credentials": {
+        "notionApi": {
+          "id": "KWEff7rSdcusFaMx",
+          "name": "Notion account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "databaseId": {
+          "__rl": true,
+          "value": "https://app.notion.com/p/3d727d4b39848083b065f62e4a505eb4?v=3d727d4b398480f09a59000caba39a91",
+          "mode": "url"
+        },
+        "simple": false,
+        "options": {}
+      },
+      "id": "a2884b53-7422-4834-b274-32145b600d61",
+      "name": "Notion - Guardar Ticket con Error de Validación",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2,
+      "position": [
+        -2432,
+        864
+      ],
+      "credentials": {
+        "notionApi": {
+          "id": "KWEff7rSdcusFaMx",
+          "name": "Notion account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "databaseId": {
+          "__rl": true,
+          "value": "https://app.notion.com/p/3d727d4b3984800a8daae069c45828f0?v=3d727d4b3984808c892d000c96870413",
+          "mode": "url"
+        },
+        "simple": false,
+        "options": {}
+      },
+      "id": "01c4fb5a-e709-4947-8105-61391ac2ab0e",
+      "name": "Notion - Registrar Error de Validación",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2,
+      "position": [
+        -2432,
+        1040
+      ],
+      "credentials": {
+        "notionApi": {
+          "id": "KWEff7rSdcusFaMx",
+          "name": "Notion account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={ \"status\": \"error\", \"mensaje\": \"Faltan campos obligatorios: asunto, descripcion, canal\" }",
+        "options": {}
+      },
+      "id": "51d64bb6-3385-4678-ad20-3095019062f8",
+      "name": "Respuesta Webhook - Error Validación",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        -2176,
+        864
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={ \"status\": \"ok\", \"mensaje\": \"Ticket procesado correctamente\" }",
+        "options": {}
+      },
+      "id": "829d85f6-ebc4-4e0e-ae63-642e3a60e28c",
+      "name": "Respuesta Webhook - Éxito",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        -1104,
+        800
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Asunto:{{ $json.body.asunto }}\nDescripción: {{ $json.body.descripcion }}\nCanal: {{ $json.body.canal }}",
+        "options": {
+          "systemMessage": "Sos un agente de triage de soporte técnico. El usuario te va a pasar un ticket con asunto, descripción y canal. Respondé ÚNICAMENTE con un JSON válido, sin texto adicional, sin bloques de código markdown, sin explicaciones. El JSON debe tener exactamente esta estructura:\n{\n  \"prioridad\": \"Alta|Media|Baja\",\n  \"categoria\": \"Bug|Consulta|Facturación|Acceso\",\n  \"resumen\": \"resumen breve de máximo 2 oraciones\",\n  \"respuesta_sugerida\": \"respuesta profesional al cliente de máximo 3 oraciones\",\n  \"requiere_humano\": true\n}\n\nCriterios de prioridad:\n- Alta: el cliente no puede operar, pérdida de datos, acceso bloqueado, Bug crítico\n- Media: funcionalidad degradada, consultas de facturación\n- Baja: consultas generales, dudas de uso\n\nrequiere_humano debe ser true si prioridad es Alta o categoria es Bug. En cualquier otro caso false.",
+          "maxIterations": 1
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        -2624,
+        640
+      ],
+      "id": "f5bd068d-f41e-4b8e-bf6b-b7ef64885a00",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "model": "cohere/north-mini-code:free",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "typeVersion": 1,
+      "position": [
+        -2624,
+        800
+      ],
+      "id": "f35de12c-2820-40ae-bce8-512ea47bd5bd",
+      "name": "OpenRouter Chat Model",
+      "credentials": {
+        "openRouterApi": {
+          "id": "4pC6PD0hTY6xtHDG",
+          "name": "OpenRouter account 2"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook - Ingreso de Ticket": {
+      "main": [
+        [
+          {
+            "node": "Filtro - Validar Campos Obligatorios",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filtro - Validar Campos Obligatorios": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Notion - Guardar Ticket con Error de Validación",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Notion - Registrar Error de Validación",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code - Parsear Respuesta IA": {
+      "main": [
+        [
+          {
+            "node": "Router - ¿Error de Parseo?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Router - ¿Error de Parseo?": {
+      "main": [
+        [
+          {
+            "node": "Notion - Registrar Error de Parseo",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Notion - Guardar Ticket Procesado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notion - Guardar Ticket Procesado": {
+      "main": [
+        [
+          {
+            "node": "Router - ¿Requiere Aprobación Humana?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Router - ¿Requiere Aprobación Humana?": {
+      "main": [
+        [
+          {
+            "node": "Gmail - Notificación Human-in-the-loop",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Gmail - Respuesta Automática al Cliente",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gmail - Notificación Human-in-the-loop": {
+      "main": [
+        [
+          {
+            "node": "Respuesta Webhook - Éxito",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gmail - Respuesta Automática al Cliente": {
+      "main": [
+        [
+          {
+            "node": "Respuesta Webhook - Éxito",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notion - Guardar Ticket con Error de Validación": {
+      "main": [
+        [
+          {
+            "node": "Respuesta Webhook - Error Validación",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenRouter Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Code - Parsear Respuesta IA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "052b56ba-27e8-4750-9a9f-d9e63e084cef",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "6982212570c1692b8ad945e2a86627ae7e3d4840b0049ecc2781a8fec70711dc"
+  },
+  "nodeGroups": [],
+  "id": "Mu3F1MHUJu9v3t16",
+  "tags": []
+}
