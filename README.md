@@ -45,7 +45,7 @@ Diagrama completo y detalle de cada nodo en [`documentacion_arquitectura.pdf`](.
 | `documentacion_arquitectura_v3.pdf` | Documentación completa (arquitectura, datos, costos, seguridad, dashboard) |
 | `/evidencia/` | Screenshots de los 5 tests ejecutados en n8n |
 
-**-No se entrgará video Demo por problemas con OBS Studio, sin embargo en las capturas de los Test se ve al flujo y su funcionamiento.-**
+** -- No se entrgará video Demo por problemas con OBS Studio, sin embargo en las capturas de los Test se ve el flujo y su funcionamiento, lo que mostraría el video. --**
 ---
 
 ## Base de datos — Notion (modo lectura)
